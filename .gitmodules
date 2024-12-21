@@ -1,0 +1,3 @@
+[submodule "GNUI"]
+	path = GNUI
+	url = https://github.com/MxDuck/GNUI.git
