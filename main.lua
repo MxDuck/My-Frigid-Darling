@@ -8,6 +8,7 @@ config:name(ID)
 local GNUI = require("GNUI.main")
 local Button = require("GNUI.element.button")
 local Slider = require("GNUI.element.slider")
+local TextField = require("GNUI.element.textField")
 local GNUITheme = require("GNUI.theme.gntheme")
 local newBox = GNUI.newBox
 local playSound = GNUI.playSound
@@ -58,7 +59,7 @@ local chars = {
 	MLI = {name = "Milly",status = "fine",revealed = false,events = {}}
 }
 local gameState = config:load("GAME_STATE") or {
-	path = {{node = "start", musicPlaying = true, chars = deepCopyTable(chars)
+	path = {{node = "name_select", musicPlaying = true, chars = deepCopyTable(chars)
 	}},
 	currStep = 1,
 	musicPlaying = true,
@@ -168,6 +169,12 @@ story = {
 			{choice = "Who are you?", goTo = "MILLY_NODE"}
 		},
 		sprite = {char = "MLI",base = "neutral",face = "neutral"}
+	},
+	name_select = {
+		backdrop = "observatory",
+		text = {text = "Please type in the name you would like to be called!"},
+		name = "",
+		goTo = "start"
 	},
 	start = {
 		backdrop = "park_bench",
@@ -1176,16 +1183,16 @@ story = {
 		backdrop = "cat_cafe_out",
 		text = {text = "You both leave and throughout the future you continue to be friends, doing.. §o*Checks notes*§r"},
 		name = "Story",
-		goTo = "cat_cafe_end5",
-		script = function()
-			story.cat_cafe_end5.text = tallyEvents()
-		end
+		goTo = "cat_cafe_end5"
 	},
 	cat_cafe_end5 = {
 		backdrop = "cat_cafe_out",
 		text = "???",
 		name = "Story",
-		goTo = "cat_cafe_end6"
+		goTo = "cat_cafe_end6",
+		script = function()
+			story.cat_cafe_end5.text = tallyEvents()
+		end
 	},
 	cat_cafe_end6 = {
 		backdrop = "cat_cafe_out",
@@ -1287,16 +1294,16 @@ story = {
 		backdrop = "soup_way",
 		text = {text = "You both leave and throughout the future you continue to be friends, doing.. §o*Checks notes*§r"},
 		name = "Story",
-		goTo = "soup_way_end5",
-		script = function()
-			story.soup_way_end5.text = tallyEvents()
-		end
+		goTo = "soup_way_end5"
 	},
 	soup_way_end5 = {
 		backdrop = "soup_way",
 		text = "???",
 		name = "Story",
-		goTo = "soup_way_end6"
+		goTo = "soup_way_end6",
+		script = function()
+			story.soup_way_end5.text = tallyEvents()
+		end
 	},
 	soup_way_end6 = {
 		backdrop = "soup_way",
@@ -1461,16 +1468,16 @@ story = {
 		backdrop = "observatory",
 		text = {text = "Eventually, you both leave and throughout the future you continue to hang out, doing.. §o*Checks notes*§r"},
 		name = "Story",
-		goTo = "observatory6",
-		script = function()
-			story.observatory6.text = tallyEvents()
-		end
+		goTo = "observatory6"
 	},
 	observatory6= {
 		backdrop = "observatory",
 		text = "???",
 		name = "Story",
-		goTo = "TRUE_END"
+		goTo = "TRUE_END",
+		script = function()
+			story.observatory6.text = tallyEvents()
+		end
 	},
 	TRUE_END = {
 		backdrop = "observatory",
@@ -1529,6 +1536,7 @@ local millyDim = vec(0,-200,200,0)
 
 local dialog = newBox(scene):setAnchor(.5,1)
 	:setNineslice(defNnsc)
+	:setCanCaptureCursor(false)
 	local dialog_text = newBox(dialog)
 	:setText(testTxt)
 	:setTextBehavior("WRAP")
@@ -1554,7 +1562,19 @@ local options = newBox(scene)
 	:setAnchor(.5,0,.5,0)
 	:setDimensions(-110,0,110,80)
 
+local name_field = TextField.new(scene,false)
+	:setAnchor(.5,.5)
+	:setDimensions(-96,-16,96,16)
 
+
+
+name_field.FIELD_CHANGED:register(function(txt)
+	name_field.textField = txt
+	gameState.chars.Player.name = txt
+	for i,v in ipairs(gameState.path) do
+		v.chars.Player.name = txt
+	end
+end)
 
 local nextNode
 
@@ -1567,9 +1587,9 @@ for i=1,4 do
 		local MLI = gameState.chars.MLI
 		local node = story[currNode.."_"..MLI.status] or story[currNode]
 		nextNode(node.options[i].goTo)
-
+		return true
   -- clicked
-end)
+	end)
 btn:setAnchor(0,0+(i-1)*.25,1,.25*i)
 :setPos(0,6)
 TINSERT(optButtons,btn)
@@ -1664,9 +1684,12 @@ local function setNode(step,ignoreScript)
 	else
 		name = type(nName) == "string" and nName or ""
 	end
-	if (node.text and node.text.text == "The end.") or node.text == "The end."  then dialog_scale = 30 else dialog_scale = 150 end
+	if (node.text and node.text.text == "The end.") or node.text == "The end."  then
+		dialog_scale = 30 else dialog_scale = 150
+	end
+	name_field:setVisible(nodeID == "name_select")
 	nametag_text:setText(name)
-	dialog_text:setText(processText(node.text))
+	dialog_text:setText(processText(deepCopyTable(node.text)))
 	backdropSlice:setTexture(backdrops[node.backdrop or "def"] or defTxtr)
 	local sprite = node.sprite
 	sprites:setVisible(not not sprite)
@@ -1696,10 +1719,8 @@ function nextNode(nodeID)
 	setNode(#path)
 end
 
--- setNode(1)
-
 local function forward()
- if not game.started or not game.playing or menu_state then return  menu_state end
+ if not game.started or not game.playing or menu_state then return (menu_state or game.started) and game.playing end
  local curStep = gameState.currStep
  local next = story[gameState.path[curStep].node]
  if #gameState.path > curStep then
@@ -1711,7 +1732,7 @@ local function forward()
 end
 
 local function backward()
- if not game.started or not game.playing or menu_state then return  menu_state end
+ if not game.started or not game.playing or menu_state then return (menu_state or game.started) and game.playing end
  local curStep = gameState.currStep
  local next = story[gameState.path[curStep].node]
   setNode(curStep -1)
@@ -1727,7 +1748,7 @@ for i,v in pairs(backs) do
 end
 
 for i=1,4 do
-	keybinds:fromVanilla(movement[i]):onPress(function() return menu_state or game.started and game.playing end)
+	keybinds:fromVanilla(movement[i]):onPress(function() return (menu_state or game.started) and game.playing end)
 end
 
 function events.MOUSE_SCROLL(dlt)
@@ -1742,7 +1763,14 @@ function events.MOUSE_SCROLL(dlt)
 	return true
 end
 
+function events.KEY_PRESS(key,state,mod)
+	if name_field.Visible and game.playing and key == 257 and state == 1 then
+		forward()
+		return true
+	end
+end
 
+-- backdrop.INPUT:register(function(input) if input.state == 1 and  input.key == "key.mouse.left" then log(input, id) forward() end end) -- To be added back when GN fixes Shtuff
 local toggleKey = keybinds:newKeybind("Toggle Game Screen","key.keyboard.grave.accent")
 
 
@@ -1792,6 +1820,8 @@ local function startGame()
 	main_menu.Nineslice:setVisible(true)
 	game.started = true
 	toggleGame(true,true)
+	name_field.textField = gameState.chars.Player.name
+	name_field:updateField()
 end
 
 toggleGame(false)
@@ -1878,7 +1908,6 @@ do
 end
 
 
-
 for i,v in pairs(menuButtons) do
 	local btn = v.btn
 	local txt = newBox(btn):setPos(4,0):setText(v.txt):setAnchor(0,.5):setTextEffect("OUTLINE"):setTextBehavior("NONE"):setFontScale(1.5):setTextAlign(0,.5)
@@ -1887,7 +1916,7 @@ for i,v in pairs(menuButtons) do
 	btn.PRESSED:register(function() selectMenuSection(i) end)
 end
 
-rightclick:setOnPress(function() if not game.started then return end toggleMainMenu(not menu_state) end)
+rightclick:setOnPress(function() if not game.started then return end name_field:setEditing(false) toggleMainMenu(not menu_state) end)
 
 
 local leavePos = 0
